@@ -28,7 +28,8 @@ void MainMenu()
         Console.WriteLine("  1) Start Jump Scare Counter");
         Console.WriteLine("  2) Reset Jump Scare Counter to 0");
         Console.WriteLine("  3) Configure Hotkeys");
-        Console.WriteLine("  4) Quit");
+        Console.WriteLine($"  4) Copy .txt file path to clipboard");
+        Console.WriteLine("  5) Quit");
         Console.WriteLine();
         Console.Write("  Choice: ");
 
@@ -38,7 +39,8 @@ void MainMenu()
             case '1': RunCounter(); break;
             case '2': ResetCounter(); break;
             case '3': ConfigureHotkeys(); break;
-            case '4': return;
+            case '4': CopyTxtPath(); break;
+            case '5': return;
         }
     }
 }
@@ -98,6 +100,28 @@ void PrintCount(int row, int count)
     Console.SetCursorPosition(0, row);
     Console.Write($"  Jump Scare Count: {count}          ");
     Console.SetCursorPosition(origCol, origRow);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4) COPY TXT FILE PATH
+// ─────────────────────────────────────────────────────────────────────────────
+void CopyTxtPath()
+{
+    // Clipboard requires STA; top-level statements run MTA by default
+    var sta = new Thread(() => System.Windows.Forms.Clipboard.SetText(AppDataManager.CountTxt));
+    sta.SetApartmentState(ApartmentState.STA);
+    sta.Start();
+    sta.Join();
+
+    Console.Clear();
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine("  Path copied to clipboard!");
+    Console.ResetColor();
+    Console.WriteLine();
+    Console.WriteLine($"  {AppDataManager.CountTxt}");
+    Console.WriteLine();
+    Console.WriteLine("  Press any key to return to the menu...");
+    Console.ReadKey(intercept: true);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
