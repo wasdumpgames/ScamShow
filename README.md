@@ -1,6 +1,7 @@
 # ScamShow
 
 A lightweight Windows console utility for tracking **jump scare counts** during live streams, recordings, or gaming sessions.  
+
 Counts are updated in real-time via global hotkeys, persisted to your AppData folder, and exported to a plain `.txt` file that can be dropped straight into OBS or any overlay tool.
 
 ---
