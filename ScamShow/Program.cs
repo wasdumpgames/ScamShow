@@ -6,6 +6,14 @@ var config = AppDataManager.LoadConfig();
 var state  = AppDataManager.LoadState();
 AppDataManager.SaveState(state); // ensure txt is synced on launch
 
+// Persistent mouse invert hook — started/stopped as state changes
+MouseInvertHook? mouseHook = null;
+if (state.MouseYInverted)
+{
+    mouseHook = new MouseInvertHook();
+    mouseHook.Start();
+}
+
 MainMenu();
 return;
 
@@ -19,7 +27,7 @@ void MainMenu()
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("╔══════════════════════════════════╗");
-        Console.WriteLine("║         SCAM SHOW  v1.0          ║");
+        Console.WriteLine("║         SCAM SHOW  v1.5          ║");
         Console.WriteLine("╚══════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
@@ -29,7 +37,9 @@ void MainMenu()
         Console.WriteLine("  2) Reset Jump Scare Counter to 0");
         Console.WriteLine("  3) Configure Hotkeys");
         Console.WriteLine($"  4) Copy .txt file path to clipboard");
-        Console.WriteLine("  5) Quit");
+        string invertLabel = state.MouseYInverted ? "ON " : "OFF";
+        Console.WriteLine($"  5) Invert Mouse Y Axis          [{invertLabel}]");
+        Console.WriteLine("  6) Quit");
         Console.WriteLine();
         Console.Write("  Choice: ");
 
@@ -40,12 +50,13 @@ void MainMenu()
             case '2': ResetCounter(); break;
             case '3': ConfigureHotkeys(); break;
             case '4': CopyTxtPath(); break;
-            case '5': return;
+            case '5': ToggleMouseInvert(); break;
+            case '6': return;
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────z
 // 1) RUN COUNTER  (global hotkeys active)
 // ─────────────────────────────────────────────────────────────────────────────
 void RunCounter()
@@ -57,14 +68,16 @@ void RunCounter()
     Console.WriteLine();
     Console.WriteLine($"  [{config.Hotkeys[HotkeyAction.IncrementCount]}]  Increment");
     Console.WriteLine($"  [{config.Hotkeys[HotkeyAction.DecrementCount]}]  Decrement");
+    Console.WriteLine($"  [{config.Hotkeys[HotkeyAction.ToggleMouseInvert]}]  Toggle Mouse Y Invert");
     Console.WriteLine($"  [{config.Hotkeys[HotkeyAction.Quit]}]             Stop & return to menu");
     Console.WriteLine();
 
-    // Row where the live count is printed
-    int countRow = Console.CursorTop;
+    int countRow  = Console.CursorTop;
+    int invertRow = countRow + 1;
     PrintCount(countRow, state.JumpScareCount);
+    PrintInvert(invertRow, state.MouseYInverted);
 
-    var quit = new ManualResetEventSlim(false);
+    var quit  = new ManualResetEventSlim(false);
     var @lock = new object();
 
     using var hook = new GlobalKeyboardHook(config);
@@ -76,16 +89,22 @@ void RunCounter()
             {
                 case HotkeyAction.IncrementCount:
                     state.JumpScareCount++;
+                    AppDataManager.SaveState(state);
+                    PrintCount(countRow, state.JumpScareCount);
                     break;
                 case HotkeyAction.DecrementCount:
                     state.JumpScareCount--;
+                    AppDataManager.SaveState(state);
+                    PrintCount(countRow, state.JumpScareCount);
+                    break;
+                case HotkeyAction.ToggleMouseInvert:
+                    ApplyMouseInvertToggle();
+                    PrintInvert(invertRow, state.MouseYInverted);
                     break;
                 case HotkeyAction.Quit:
                     quit.Set();
                     return;
             }
-            AppDataManager.SaveState(state);
-            PrintCount(countRow, state.JumpScareCount);
         }
     };
 
@@ -100,6 +119,50 @@ void PrintCount(int row, int count)
     Console.SetCursorPosition(0, row);
     Console.Write($"  Jump Scare Count: {count}          ");
     Console.SetCursorPosition(origCol, origRow);
+}
+
+void PrintInvert(int row, bool inverted)
+{
+    int origRow = Console.CursorTop;
+    int origCol = Console.CursorLeft;
+    Console.SetCursorPosition(0, row);
+    string label = inverted ? "ON " : "OFF";
+    Console.Write($"  Mouse Y Invert:   {label}   ");
+    Console.SetCursorPosition(origCol, origRow);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5) TOGGLE MOUSE Y INVERT
+// ─────────────────────────────────────────────────────────────────────────────
+void ToggleMouseInvert()
+{
+    ApplyMouseInvertToggle();
+
+    Console.Clear();
+    string status = state.MouseYInverted ? "ENABLED" : "DISABLED";
+    Console.ForegroundColor = state.MouseYInverted ? ConsoleColor.Green : ConsoleColor.Yellow;
+    Console.WriteLine($"  Mouse Y Invert is now {status}.");
+    Console.ResetColor();
+    Console.WriteLine();
+    Console.WriteLine("  Press any key to return to the menu...");
+    Console.ReadKey(intercept: true);
+}
+
+void ApplyMouseInvertToggle()
+{
+    state.MouseYInverted = !state.MouseYInverted;
+    AppDataManager.SaveState(state);
+
+    if (state.MouseYInverted)
+    {
+        mouseHook ??= new MouseInvertHook();
+        mouseHook.Start();
+    }
+    else
+    {
+        mouseHook?.Stop();
+        mouseHook = null;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

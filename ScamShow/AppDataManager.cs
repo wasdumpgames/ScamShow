@@ -30,8 +30,23 @@ public static class AppDataManager
         }
         try
         {
-            var json = File.ReadAllText(ConfigPath);
-            return JsonSerializer.Deserialize<AppConfig>(json, JsonOpts) ?? new AppConfig();
+            var json   = File.ReadAllText(ConfigPath);
+            var loaded = JsonSerializer.Deserialize<AppConfig>(json, JsonOpts) ?? new AppConfig();
+
+            // Backfill any hotkey actions added after the config was first saved
+            var defaults = new AppConfig();
+            bool dirty   = false;
+            foreach (var (action, binding) in defaults.Hotkeys)
+            {
+                if (!loaded.Hotkeys.ContainsKey(action))
+                {
+                    loaded.Hotkeys[action] = binding;
+                    dirty = true;
+                }
+            }
+            if (dirty) SaveConfig(loaded);
+
+            return loaded;
         }
         catch
         {

@@ -4,7 +4,8 @@ public enum HotkeyAction
 {
     IncrementCount,
     DecrementCount,
-    Quit
+    Quit,
+    ToggleMouseInvert
 }
 
 public class HotkeyBinding
@@ -43,11 +44,13 @@ public class AppConfig
     {
         [HotkeyAction.IncrementCount] = new HotkeyBinding { VirtualKeyCode = 0xBB, Ctrl = true }, // Ctrl + =  (OEM_PLUS)
         [HotkeyAction.DecrementCount] = new HotkeyBinding { VirtualKeyCode = 0xBD, Ctrl = true }, // Ctrl + -  (OEM_MINUS)
-        [HotkeyAction.Quit]           = new HotkeyBinding { VirtualKeyCode = (int)System.Windows.Forms.Keys.Q, Ctrl = true }
+        [HotkeyAction.Quit]              = new HotkeyBinding { VirtualKeyCode = (int)System.Windows.Forms.Keys.Q, Ctrl = true },
+        [HotkeyAction.ToggleMouseInvert] = new HotkeyBinding { VirtualKeyCode = (int)System.Windows.Forms.Keys.M, Ctrl = true }
     };
 }
 
 public class AppState
 {
     public int JumpScareCount { get; set; } = 0;
+    public bool MouseYInverted { get; set; } = false;
 }
