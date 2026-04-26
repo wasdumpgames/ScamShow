@@ -29,6 +29,7 @@ public sealed class MouseInvertHook : IDisposable
     [DllImport("user32.dll")] private static extern int    GetSystemMetrics(int nIndex);
     [DllImport("user32.dll")] private static extern bool   PostThreadMessage(uint idThread, uint msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] private static extern int    GetMessage(out MSG lpMsg, IntPtr hWnd, uint f, uint t);
+    [DllImport("user32.dll")] private static extern bool   PeekMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
     [DllImport("user32.dll")] private static extern bool   TranslateMessage(ref MSG m);
     [DllImport("user32.dll")] private static extern IntPtr DispatchMessage(ref MSG m);
 
@@ -81,6 +82,8 @@ public sealed class MouseInvertHook : IDisposable
     private volatile bool _disposed;
     private POINT   _lastPt;
     private bool    _hasPrev;
+    private readonly ManualResetEventSlim _threadStarted = new(false);
+    private readonly ManualResetEventSlim _exitEvent = new(false);
 
     public MouseInvertHook()
     {
@@ -91,24 +94,54 @@ public sealed class MouseInvertHook : IDisposable
 
     public void Start()
     {
+        if (_thread != null && _thread.IsAlive) return; // Already started
+
         _hasPrev = false;
+        _disposed = false;
+        _threadStarted.Reset();
+        _exitEvent.Reset();
         _thread  = new Thread(() =>
         {
             using var proc   = Process.GetCurrentProcess();
             using var module = proc.MainModule!;
             _hookId = SetWindowsHookEx(WH_MOUSE_LL, _proc, GetModuleHandle(module.ModuleName!), 0);
 
-            while (!_disposed && GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+            if (_hookId == IntPtr.Zero)
             {
-                TranslateMessage(ref msg);
-                DispatchMessage(ref msg);
+                _threadStarted.Set();
+                return; // Failed to set hook
             }
 
-            if (_hookId != IntPtr.Zero) UnhookWindowsHookEx(_hookId);
+            // Signal that hook is set up
+            _threadStarted.Set();
+
+            // Keep hook responsive with a non-blocking message pump
+            while (!_disposed)
+            {
+                if (PeekMessage(out var msg, IntPtr.Zero, 0, 0, 0x0001)) // PM_REMOVE = 0x0001
+                {
+                    TranslateMessage(ref msg);
+                    DispatchMessage(ref msg);
+                }
+                else
+                {
+                    // Yield to prevent 100% CPU usage
+                    System.Threading.Thread.Yield();
+                }
+            }
+
+            // Unhook before exiting
+            if (_hookId != IntPtr.Zero)
+            {
+                UnhookWindowsHookEx(_hookId);
+                _hookId = IntPtr.Zero;
+            }
         })
         { IsBackground = true, Name = "MouseInvertHookThread" };
 
         _thread.Start();
+        // Wait for hook to actually be set up before returning
+        _threadStarted.Wait(1000);
     }
 
     public void Stop() => Dispose();
@@ -117,7 +150,22 @@ public sealed class MouseInvertHook : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        PostThreadMessage((uint)(_thread?.ManagedThreadId ?? 0), 0x0012 /*WM_QUIT*/, IntPtr.Zero, IntPtr.Zero);
+
+        // Signal the thread to exit
+        _exitEvent.Set();
+
+        if (_thread != null && _thread.IsAlive)
+        {
+            // Wait for thread to exit cleanly
+            if (!_thread.Join(2000))
+            {
+                // Force abort if thread doesn't exit
+                try { _thread.Abort(); } catch { }
+            }
+        }
+
+        _threadStarted?.Dispose();
+        _exitEvent?.Dispose();
     }
 
     // ── Hook callback ────────────────────────────────────────────────────────

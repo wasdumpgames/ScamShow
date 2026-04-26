@@ -4,6 +4,14 @@ using System.Runtime.InteropServices;
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 var config = AppDataManager.LoadConfig();
 var state  = AppDataManager.LoadState();
+
+// Safeguard: Ensure MouseYInverted defaults to false on startup (prevents stuck state)
+if (state.MouseYInverted)
+{
+    state.MouseYInverted = false;
+    AppDataManager.SaveState(state);
+}
+
 AppDataManager.SaveState(state); // ensure txt is synced on launch
 
 // Persistent mouse invert hook — started/stopped as state changes
@@ -39,7 +47,8 @@ void MainMenu()
         Console.WriteLine($"  4) Copy .txt file path to clipboard");
         string invertLabel = state.MouseYInverted ? "ON " : "OFF";
         Console.WriteLine($"  5) Invert Mouse Y Axis          [{invertLabel}]");
-        Console.WriteLine("  6) Quit");
+        Console.WriteLine("  6) Edit Text File Prefix");
+        Console.WriteLine("  7) Quit");
         Console.WriteLine();
         Console.Write("  Choice: ");
 
@@ -51,7 +60,8 @@ void MainMenu()
             case '3': ConfigureHotkeys(); break;
             case '4': CopyTxtPath(); break;
             case '5': ToggleMouseInvert(); break;
-            case '6': return;
+            case '6': EditTextFilePrefix(); break;
+            case '7': return;
         }
     }
 }
@@ -99,6 +109,7 @@ void RunCounter()
                     break;
                 case HotkeyAction.ToggleMouseInvert:
                     ApplyMouseInvertToggle();
+                    System.Threading.Thread.Sleep(100); // Give hook time to start/stop
                     PrintInvert(invertRow, state.MouseYInverted);
                     break;
                 case HotkeyAction.Quit:
@@ -324,5 +335,72 @@ void BindHotkey(AppConfig cfg, HotkeyAction action)
 
     Console.WriteLine("  Press any key to continue...");
     Console.ReadKey(intercept: true);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6) EDIT TEXT FILE PREFIX
+// ─────────────────────────────────────────────────────────────────────────────
+void EditTextFilePrefix()
+{
+    while (true)
+    {
+        Console.Clear();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  ── Edit Text File Prefix ──────────────────");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine($"  Current Prefix: \"{state.TextFilePrefix}\"");
+        Console.WriteLine();
+        Console.WriteLine("  Enter Text to Display Before Count:");
+        Console.Write("  > ");
+
+        string? input = Console.ReadLine();
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  Input cannot be empty. Press any key to try again...");
+            Console.ResetColor();
+            Console.ReadKey(intercept: true);
+            continue;
+        }
+
+        // Show example
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("  Example:");
+        Console.WriteLine($"  {input} {state.JumpScareCount}");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.Write("  Is this ok? (y/n): ");
+
+        var confirmation = Console.ReadKey(intercept: true).KeyChar;
+        Console.WriteLine();
+
+        if (char.ToLower(confirmation) == 'y')
+        {
+            state.TextFilePrefix = input;
+            AppDataManager.SaveState(state);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  Text File Prefix saved successfully.");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.WriteLine("  Press any key to return to the menu...");
+            Console.ReadKey(intercept: true);
+            return;
+        }
+        else if (char.ToLower(confirmation) == 'n')
+        {
+            Console.WriteLine("  Cancelled. Try again...");
+            Console.WriteLine();
+            continue;
+        }
+        else
+        {
+            Console.WriteLine("  Invalid choice. Press any key to try again...");
+            Console.ReadKey(intercept: true);
+        }
+    }
 }
 

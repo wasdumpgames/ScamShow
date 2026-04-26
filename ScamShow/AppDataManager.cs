@@ -83,6 +83,6 @@ public static class AppDataManager
     public static void SaveState(AppState state)
     {
         File.WriteAllText(StatePath, JsonSerializer.Serialize(state, JsonOpts));
-        File.WriteAllText(CountTxt, state.JumpScareCount.ToString());
+        File.WriteAllText(CountTxt, $"{state.TextFilePrefix} {state.JumpScareCount}");
     }
 }

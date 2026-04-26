@@ -53,4 +53,5 @@ public class AppState
 {
     public int JumpScareCount { get; set; } = 0;
     public bool MouseYInverted { get; set; } = false;
+    public string TextFilePrefix { get; set; } = "Scam Scares";
 }
